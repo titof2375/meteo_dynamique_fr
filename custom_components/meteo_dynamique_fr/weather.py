@@ -26,14 +26,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_NAME, CONF_TRACKER_ENTITY, DOMAIN, format_condition
+from .const import CONF_NAME, CONF_TRACKER_ENTITY, DATA_WEATHER, DOMAIN, format_condition
 from .coordinator import MeteoDynamiqueCoordinator
 
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    coordinator: MeteoDynamiqueCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: MeteoDynamiqueCoordinator = hass.data[DOMAIN][entry.entry_id][DATA_WEATHER]
     async_add_entities([MeteoDynamiqueWeather(coordinator, entry)])
 
 
@@ -118,6 +118,9 @@ class MeteoDynamiqueWeather(CoordinatorEntity[MeteoDynamiqueCoordinator], Weathe
             "latitude_suivie": position.get("lat"),
             "longitude_suivie": position.get("lon"),
             "nom_lieu_meteo_france": position.get("name"),
+            # Département déduit par Météo-France pour cette position : c'est celui
+            # utilisé automatiquement par le capteur sensor.*_weather_alert.
+            "departement": position.get("dept"),
         }
 
     async def async_forecast_daily(self) -> list[Forecast] | None:
