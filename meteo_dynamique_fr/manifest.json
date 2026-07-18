@@ -1,0 +1,12 @@
+{
+  "domain": "meteo_dynamique_fr",
+  "name": "Météo Dynamique (Météo-France)",
+  "version": "1.0.0",
+  "config_flow": true,
+  "documentation": "https://github.com/titof2375/meteo_dynamique_fr",
+  "issue_tracker": "https://github.com/titof2375/meteo_dynamique_fr/issues",
+  "codeowners": ["@titof2375"],
+  "requirements": ["meteofrance-api>=1.4.0"],
+  "iot_class": "cloud_polling",
+  "integration_type": "hub"
+}

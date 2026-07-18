@@ -1,0 +1,28 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Météo Dynamique - New tracked position",
+        "description": "Adds an instance that recomputes weather (Open-Meteo) from the current GPS position of the chosen person or tracker. Add one instance per person to track.",
+        "data": {
+          "name": "Name (e.g. Weather Christophe)",
+          "tracker_entity": "Person or tracker to follow",
+          "scan_interval": "Refresh interval (minutes)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This entity is already tracked by an existing instance."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options - Météo Dynamique",
+        "data": {
+          "scan_interval": "Refresh interval (minutes)"
+        }
+      }
+    }
+  }
+}
