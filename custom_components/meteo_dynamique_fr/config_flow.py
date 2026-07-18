@@ -1,4 +1,4 @@
-"""Config flow pour Météo Dynamique (Open-Meteo)."""
+"""Config flow pour Météo Dynamique (Météo-France)."""
 from __future__ import annotations
 
 from typing import Any
