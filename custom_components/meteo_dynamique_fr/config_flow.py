@@ -34,7 +34,7 @@ class MeteoDynamiqueConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_NAME): selector.TextSelector(),
                 vol.Required(CONF_TRACKER_ENTITY): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain=["person", "device_tracker"])
+                    selector.EntitySelectorConfig(domain=["person", "device_tracker", "zone"])
                 ),
                 vol.Optional(
                     CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL_MINUTES
