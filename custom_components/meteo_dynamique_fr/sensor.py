@@ -131,10 +131,14 @@ class MeteoDynamiqueNextRainSensor(MeteoDynamiqueSensorBase):
             return {}
 
         # Prévision minute par minute (cadrans ~5 minutes renvoyés par l'API) des
-        # 60 prochaines minutes : {"HH:MM:SS+TZ": "Pluie faible", ...}.
+        # 60 prochaines minutes : {"HH:MM:SS+00:00": "Pluie faible", ...}.
+        # NB : on utilise _ts_to_utc() (stdlib) et non rain.timestamp_to_locale_time()
+        # (pytz) : ce dernier ouvre les fichiers de fuseaux horaires de façon
+        # bloquante et gèle la boucle événementielle de HA pendant plusieurs
+        # secondes à chaque mise à jour (cf. warning "Detected blocking call").
         forecast_detail: dict[str, str] = {}
         for cadran in rain.forecast:
-            dt_cadran = rain.timestamp_to_locale_time(cadran["dt"])
+            dt_cadran = _ts_to_utc(cadran["dt"])
             level = cadran.get("rain")
             forecast_detail[dt_cadran.isoformat()] = RAIN_LEVEL_DESCRIPTIONS.get(
                 level, f"Niveau {level}"
@@ -226,22 +230,37 @@ class MeteoDynamiqueCloudCoverSensor(MeteoDynamiqueSensorBase):
         return current.get("clouds")
 
 
-# Clés candidates dans probability_forecast pour chaque type d'événement : selon
-# l'horizon de la prévision, Météo-France renvoie soit une clé "à 3h"/"à 6h" (jours
-# proches), soit une clé simple (jours lointains). On prend la première présente.
-# ATTENTION : ces sous-clés n'ont pas pu être vérifiées de façon certaine (le format
-# exact varie selon les versions de l'API) ; vérifiez avec Outils de développement >
-# Modèles sur `probability_forecast[0]` de votre position et ajustez si besoin.
-_PROBABILITY_CANDIDATE_KEYS: dict[str, tuple[str, ...]] = {
-    "rain": ("rain 3h", "rain 6h", "rain"),
-    "snow": ("snow 3h", "snow 6h", "snow"),
-    "freezing": ("freezing",),
-}
+# Structure RÉELLE confirmée par un traceback Home Assistant en conditions
+# réelles (sensor.control_maison_meteo_probabilite_de_pluie) :
+#   probability_forecast[i]["rain"] == {"3h": <int|None>, "6h": <int|None>}
+# (dict imbriqué, PAS des clés séparées "rain 3h"/"rain 6h" comme supposé au
+# départ). "freezing" semble être une valeur simple (à confirmer si besoin).
+# Les deux sous-clés peuvent valoir None (échéance pas encore disponible) :
+# dans ce cas on regarde les entrées suivantes de la liste (jours suivants)
+# jusqu'à trouver une valeur exploitable, au lieu de se figer sur l'entrée 0.
+_PROBABILITY_SUB_KEYS: tuple[str, ...] = ("3h", "6h")
 _PROBABILITY_ICONS = {
     "rain": "mdi:weather-rainy",
     "snow": "mdi:weather-snowy",
     "freezing": "mdi:snowflake-alert",
 }
+
+
+def _extract_probability(raw: Any) -> float | None:
+    """Extrait une valeur numérique d'une entrée probability_forecast[kind].
+
+    Gère à la fois un dict imbriqué {"3h": ..., "6h": ...} (cas réel confirmé)
+    et, par prudence, une valeur simple déjà numérique.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, dict):
+        for sub_key in _PROBABILITY_SUB_KEYS:
+            value = raw.get(sub_key)
+            if value is not None:
+                return value
+        return None
+    return raw
 
 
 class MeteoDynamiqueProbabilitySensor(MeteoDynamiqueSensorBase):
@@ -260,10 +279,11 @@ class MeteoDynamiqueProbabilitySensor(MeteoDynamiqueSensorBase):
     @property
     def native_value(self) -> float | None:
         probability = (self.coordinator.data or {}).get("probability") or []
-        if not probability:
-            return None
-        nearest = probability[0]
-        for candidate_key in _PROBABILITY_CANDIDATE_KEYS[self._kind]:
-            if candidate_key in nearest and nearest[candidate_key] is not None:
-                return nearest[candidate_key]
+        # Cherche la première échéance (parmi les jours à venir) où une valeur
+        # est disponible pour ce type d'événement, plutôt que de se figer sur
+        # l'entrée la plus proche qui peut être encore vide (valeurs à None).
+        for entry_forecast in probability:
+            value = _extract_probability(entry_forecast.get(self._kind))
+            if value is not None:
+                return value
         return None
